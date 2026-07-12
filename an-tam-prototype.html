@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>An Tâm — Mô phỏng luồng màn hình</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green:#5f9c56;        --green-dark:#24422e;   --green-pale:#e8f2e2;
+    --orange:#e08d3c;       --orange-pale:#fcefdd;
+    --red:#d64545;          --red-pale:#fbe8e8;
+    --blue:#3e7cb2;         --blue-pale:#e8f1f9;
+    --cream:#faf7f0;        --ink:#22301f;          --gray:#8b9587;
+    --white:#ffffff;        --line:#e3ddce;
+    --shadow: 0 10px 30px rgba(36,66,46,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(circle at 20% 10%, #eef3e6, #dfe7d6 45%, #cfd9c4 100%);
+    min-height:100vh;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 16px 60px;
+  }
+  .lab-header{ text-align:center; max-width:640px; margin-bottom:18px; }
+  .lab-header .eyebrow{
+    font-family:'Baloo 2',sans-serif; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--green-dark); font-size:12.5px; opacity:.75;
+  }
+  .lab-header h1{ font-family:'Baloo 2',sans-serif; font-size:26px; margin:4px 0 8px; color:var(--green-dark);}
+  .lab-header p{ font-size:14px; color:#54604e; line-height:1.5; margin:0;}
+
+  .toolbar{
+    display:flex; align-items:center; gap:10px; margin-bottom:18px;
+    background:var(--white); border:1px solid var(--line); border-radius:999px;
+    padding:8px 10px 8px 8px; box-shadow:var(--shadow); max-width:94vw;
+  }
+  .toolbar button{
+    font-family:'Inter',sans-serif; font-weight:700; font-size:13px; cursor:pointer;
+    border:none; border-radius:999px; padding:9px 16px; background:var(--green-pale); color:var(--green-dark);
+    transition:.15s;
+  }
+  .toolbar button:hover{ background:var(--green); color:#fff; }
+  .toolbar .crumb{ font-size:12.5px; color:var(--gray); padding:0 8px; border-left:1px solid var(--line); margin-left:2px;
+    max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---- Phone frame ---- */
+  .frame-wrap{ position:relative; }
+  #phone{
+    width:375px; height:812px; background:#0c1210; border-radius:46px; padding:14px;
+    box-shadow: var(--shadow), 0 0 0 2px #0c1210;
+    position:relative; transition: width .35s ease, height .35s ease;
+  }
+  #phone.tablet{ width:640px; height:460px; border-radius:22px; padding:16px; }
+  #screen-area{
+    width:100%; height:100%; background:var(--cream); border-radius:32px; overflow:hidden; position:relative;
+  }
+  #phone.tablet #screen-area{ border-radius:14px; }
+  .notch{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width:120px; height:22px; background:#0c1210; border-radius:14px; z-index:50;
+  }
+  #phone.tablet .notch{ display:none; }
+  .statusbar{
+    height:34px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 22px; font-size:12px; font-weight:700; color:var(--ink); flex-shrink:0;
+  }
+
+  /* ---- Screens ---- */
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column; }
+  .screen.active{ display:flex; }
+  .content{ flex:1; overflow-y:auto; padding:16px 18px 24px; }
+  .content::-webkit-scrollbar{ width:0; }
+
+  h2.scr-title{ font-family:'Baloo 2',sans-serif; font-size:20px; color:var(--green-dark); margin:2px 0 4px;}
+  p.scr-sub{ font-size:13px; color:var(--gray); margin:0 0 16px; line-height:1.5;}
+
+  .btn{
+    display:block; width:100%; text-align:center; font-family:'Inter',sans-serif; font-weight:700;
+    font-size:15px; padding:14px 16px; border-radius:16px; border:none; cursor:pointer; margin-bottom:10px;
+    transition:.15s transform;
+  }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:var(--green); color:#fff; }
+  .btn-outline{ background:#fff; color:var(--green-dark); border:1.5px solid var(--line); }
+  .btn-danger{ background:var(--red); color:#fff; }
+  .btn-warn{ background:var(--orange); color:#fff; }
+  .btn-ghost{ background:transparent; color:var(--gray); font-weight:600; font-size:13px; padding:8px; }
+
+  .card{ background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px; margin-bottom:12px; }
+  .role-card{ display:flex; align-items:center; gap:14px; cursor:pointer; }
+  .role-card .ic{ font-size:30px; width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .role-card h3{ margin:0 0 2px; font-family:'Baloo 2',sans-serif; font-size:16px; color:var(--green-dark);}
+  .role-card p{ margin:0; font-size:12.5px; color:var(--gray);}
+  .role-card:active{ transform:scale(.98); }
+
+  .avatar{ width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-family:'Baloo 2',sans-serif; font-weight:700; color:#fff; font-size:16px; position:relative; flex-shrink:0; }
+  .avatar.lg{ width:88px; height:88px; font-size:30px; }
+  .dot-online{ position:absolute; bottom:-1px; right:-1px; width:13px; height:13px; border-radius:50%;
+    background:var(--green); border:2px solid #fff; }
+
+  .status-pill{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; padding:6px 12px; border-radius:999px;}
+  .status-safe{ background:var(--green-pale); color:var(--green-dark); }
+  .status-alert{ background:var(--red-pale); color:var(--red); }
+  .status-warn{ background:var(--orange-pale); color:var(--orange); }
+
+  /* Splash */
+  #splash .content{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; height:100%;}
+#splash .logo{
+    width: 90;
+    height:90;
+    margin-bottom:20px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+#splash .logo img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+  #splash h1{ font-family:'Baloo 2',sans-serif; color:var(--green-dark); font-size:30px; margin:0;}
+  #splash p{ color:var(--gray); font-size:13.5px; margin-top:8px; max-width:220px; }
+
+  /* Kiosk (elderly) big-mode */
+  .kiosk .content{ padding:20px; }
+  .kiosk h2.scr-title{ font-size:22px; }
+  .big-btn{
+    display:flex; align-items:center; justify-content:center; gap:12px; width:100%;
+    border:none; border-radius:26px; padding:26px 12px; margin-bottom:16px; cursor:pointer;
+    font-family:'Baloo 2',sans-serif; font-size:22px; font-weight:700; color:#fff;
+  }
+  .big-btn .emo{ font-size:32px; }
+  .big-btn.sos{ background:linear-gradient(160deg,#e2634b,#c73b3b); box-shadow:0 10px 22px rgba(199,59,59,.4);}
+  .big-btn.call{ background:linear-gradient(160deg,#79ba63,#4c8c48); box-shadow:0 10px 22px rgba(76,140,72,.35);}
+  .shortcut-row{ display:flex; gap:12px; }
+  .shortcut{ flex:1; border-radius:20px; padding:16px 10px; text-align:center; font-family:'Baloo 2',sans-serif; font-weight:700; font-size:15px; cursor:pointer;}
+  .shortcut .emo{ font-size:26px; display:block; margin-bottom:6px;}
+  .shortcut.med{ background:var(--orange-pale); color:#a1571b; }
+  .shortcut.health{ background:var(--blue-pale); color:#1f4c73; }
+  .voice-bar{
+    margin:16px 0 0; background:#eef1e9; border:1.5px dashed #c3cdb6; border-radius:18px; padding:14px 16px;
+    display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14.5px; font-weight:600; color:#4c5a44;
+  }
+  .voice-bar .mic{ font-size:20px; }
+
+  .voice-overlay{
+    position:absolute; inset:0; background:rgba(20,30,20,.88); z-index:80; display:none;
+    align-items:center; justify-content:center; flex-direction:column; color:#fff; text-align:center; padding:30px;
+  }
+  .voice-overlay.show{ display:flex; }
+  .voice-overlay .pulse{ width:70px; height:70px; border-radius:50%; background:var(--green); display:flex; align-items:center; justify-content:center;
+    font-size:30px; margin-bottom:18px; animation:pulse 1s infinite; }
+  @keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(95,156,86,.6);} 100%{ box-shadow:0 0 0 22px rgba(95,156,86,0);} }
+
+  /* countdown */
+  #elder-sos-countdown .content, #elder-sos-broadcasting .content{
+    background:linear-gradient(180deg,#c73b3b,#8f2828); color:#fff; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; height:100%; margin:-16px -18px -24px;
+  }
+  .count-num{ font-family:'Baloo 2',sans-serif; font-size:96px; font-weight:800; line-height:1; margin:10px 0 18px; }
+  .broadcast-dot{ width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; font-size:46px; margin-bottom:20px; animation:pulse 1.2s infinite; }
+
+  /* incoming call */
+  .call-2btn{ display:flex; gap:14px; margin-top:auto; }
+  .call-round{ flex:1; aspect-ratio:1; border-radius:50%; border:none; color:#fff; font-size:34px; cursor:pointer; }
+  .call-round.accept{ background:var(--green); }
+  .call-round.decline{ background:var(--red); }
+
+  /* medication popup */
+  .med-popup{ position:absolute; inset:0; background:rgba(20,30,20,.5); z-index:70; display:none; align-items:flex-end; }
+  .med-popup.show{ display:flex; }
+  .med-sheet{ background:#fff; width:100%; border-radius:26px 26px 0 0; padding:26px 22px 30px; text-align:center; }
+  .med-sheet .emo{ font-size:52px; }
+  .med-sheet h2{ font-family:'Baloo 2',sans-serif; color:var(--green-dark); margin:10px 0 4px; font-size:20px;}
+  .med-sheet p{ color:var(--gray); font-size:13.5px; margin:0 0 18px; }
+
+  .timeline-item{ display:flex; gap:10px; padding:10px 0; border-bottom:1px solid #f0ede2; }
+  .timeline-item:last-child{ border-bottom:none; }
+  .tl-dot{ width:10px; height:10px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .tl-dot.ok{ background:var(--green); } .tl-dot.warn{ background:var(--orange); } .tl-dot.bad{ background:var(--red); }
+  .tl-time{ font-size:11.5px; color:var(--gray); }
+  .tl-text{ font-size:13.5px; font-weight:600; }
+
+  .blink-red{ animation: blinkring 1s infinite; }
+  @keyframes blinkring{ 0%,100%{ box-shadow:0 0 0 0 rgba(214,69,69,.7);} 50%{ box-shadow:0 0 0 6px rgba(214,69,69,0);} }
+
+  /* toast */
+  .toast{ position:absolute; left:18px; right:18px; bottom:18px; background:var(--green-dark); color:#fff;
+    padding:12px 16px; border-radius:14px; font-size:13px; font-weight:600; z-index:90; display:none; }
+  .toast.show{ display:block; }
+
+  /* nursing grid */
+  .patient-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+  .patient-cell{ aspect-ratio:1; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:13px; color:#fff; cursor:pointer; position:relative; }
+  .patient-cell.ok{ background:var(--green); }
+  .patient-cell.warn{ background:var(--orange); }
+  .patient-cell.danger{ background:var(--red); grid-column:span 2; grid-row:span 2; font-size:15px; }
+
+  .check-row{ display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid #f0ede2; font-size:14px; font-weight:600; }
+  .check-row input{ width:18px; height:18px; accent-color:var(--green); }
+
+  .radar-map{ position:relative; height:230px; border-radius:20px; margin-bottom:14px; overflow:hidden;
+    background: repeating-linear-gradient(0deg, #dfe9d4 0 1px, transparent 1px 26px), repeating-linear-gradient(90deg, #dfe9d4 0 1px, transparent 1px 26px), #eef3e6; }
+  .radar-signal{ position:absolute; top:38%; left:55%; width:26px; height:26px; border-radius:50%; background:var(--red); }
+  .radar-ring{ position:absolute; top:38%; left:55%; width:26px; height:26px; border-radius:50%; border:3px solid var(--red); transform:translate(0,0); animation:ringout 1.6s infinite; }
+  @keyframes ringout{ 0%{ width:26px; height:26px; opacity:1; margin:0 0 0 0;} 100%{ width:110px; height:110px; opacity:0; margin:-42px 0 0 -42px;} }
+
+  .link-small{ text-align:center; font-size:12.5px; color:var(--gray); text-decoration:underline; cursor:pointer; margin-top:4px;}
+  .back-inline{ font-size:13px; font-weight:700; color:var(--green-dark); cursor:pointer; margin-bottom:10px; display:inline-block;}
+  .fine{ font-size:11.5px; color:var(--gray); margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="lab-header">
+  <div class="eyebrow">An Tâm · Mô phỏng tương tác</div>
+  <h1>An toàn cho tuổi già, an tâm cho gia đình</h1>
+  <p>Bấm vào các nút trong khung điện thoại để đi qua từng màn hình đúng luồng rẽ nhánh: Con cái/Giám hộ · Ông bà/Bố mẹ · Tình nguyện viên · Viện dưỡng lão.</p>
+</div>
+
+<div class="toolbar">
+  <button onclick="goBack()">← Quay lại</button>
+  <button onclick="restart()">⟳ Về đầu</button>
+  <span class="crumb" id="breadcrumb">Splash</span>
+</div>
+
+<div class="frame-wrap">
+  <div id="phone">
+    <div class="notch"></div>
+    <div id="screen-area">
+
+      <!-- ============ SPLASH ============ -->
+      <div class="screen active" id="splash" data-flow="Khởi động">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <div class="logo">
+              <img src="logo.png" alt="An Tâm Logo">
+          </div>
+          <h1>An Tâm</h1>
+          <p>An toàn cho tuổi già,<br>an tâm cho gia đình.</p>
+        </div>
+      </div>
+
+      <!-- ============ ROLE SELECT ============ -->
+      <div class="screen" id="role-select" data-flow="Onboarding · Chọn vai trò">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <h2 class="scr-title">Thiết bị này dành cho ai sử dụng?</h2>
+          <p class="scr-sub">Chọn một vai trò để thiết lập giao diện phù hợp cho thiết bị này.</p>
+
+          <div class="card role-card" onclick="show('child-login')">
+            <div class="ic" style="background:var(--green-pale);">🛡️</div>
+            <div><h3>Con cái / Người giám hộ</h3><p>Theo dõi, nhắc nhở và kết nối với người thân lớn tuổi.</p></div>
+          </div>
+          <div class="card role-card" onclick="show('elder-enter-code')">
+            <div class="ic" style="background:var(--orange-pale);">👴</div>
+            <div><h3>Ông bà / Bố mẹ</h3><p>Giao diện đơn giản, chữ to, thao tác một chạm.</p></div>
+          </div>
+
+          <div class="link-small" onclick="show('role-more')">Vai trò khác dành cho đối tác &amp; cộng đồng</div>
+        </div>
+      </div>
+
+      <div class="screen" id="role-more" data-flow="Onboarding · Vai trò khác">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('role-select')">← Quay lại</span>
+          <h2 class="scr-title">Vai trò cộng đồng &amp; đối tác</h2>
+          <p class="scr-sub">Dành cho lực lượng hỗ trợ tại địa phương và khách hàng doanh nghiệp.</p>
+          <div class="card role-card" onclick="show('volunteer-feed')">
+            <div class="ic" style="background:var(--blue-pale);">🤝</div>
+            <div><h3>Tình nguyện viên</h3><p>Nhận nhiệm vụ hỗ trợ người cao tuổi tại khu vực.</p></div>
+          </div>
+          <div class="card role-card" onclick="show('nursing-master-dashboard')">
+            <div class="ic" style="background:#f1e7f7;">🏥</div>
+            <div><h3>Viện dưỡng lão (B2B)</h3><p>Giám sát hàng loạt trên Web Dashboard / Tablet.</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ BRANCH A: CON CÁI ============ -->
+      <div class="screen" id="child-login" data-flow="Con cái · Đăng nhập">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('role-select')">← Đổi vai trò</span>
+          <h2 class="scr-title">Đăng ký / Đăng nhập</h2>
+          <p class="scr-sub">Nhập số điện thoại để nhận mã xác thực OTP.</p>
+          <div class="card">
+            <p class="fine" style="margin-bottom:6px;">Số điện thoại</p>
+            <div style="font-size:16px;font-weight:700;">090 123 4567</div>
+          </div>
+          <button class="btn btn-primary" onclick="show('child-otp')">Gửi mã OTP</button>
+        </div>
+      </div>
+
+      <div class="screen" id="child-otp" data-flow="Con cái · Xác thực OTP">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <h2 class="scr-title">Nhập mã OTP</h2>
+          <p class="scr-sub">Mã gồm 6 chữ số vừa gửi đến 090 123 4567.</p>
+          <div class="card" style="display:flex;gap:8px;justify-content:center;font-family:'Baloo 2';font-size:22px;font-weight:700;color:var(--green-dark);">
+            <span>3</span><span>9</span><span>0</span><span>2</span><span>1</span><span>7</span>
+          </div>
+          <button class="btn btn-primary" onclick="show('child-connect-code')">Xác nhận</button>
+        </div>
+      </div>
+
+      <div class="screen" id="child-connect-code" data-flow="Con cái · Mã kết nối">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="text-align:center;">
+          <h2 class="scr-title">Mã kết nối của bạn</h2>
+          <p class="scr-sub">Đọc mã này cho người thân, hoặc để tình nguyện viên nhập vào thiết bị của Bố/Mẹ.</p>
+          <div class="card" style="padding:26px;">
+            <div style="font-family:'Baloo 2';font-size:36px;font-weight:800;letter-spacing:6px;color:var(--green-dark);">482 913</div>
+            <div style="margin:16px auto 0;width:110px;height:110px;background:repeating-conic-gradient(#24422e 0 25%, #fff 0 50%) 0/22px 22px;border-radius:8px;"></div>
+            <p class="fine">Mã QR kết nối thiết bị</p>
+          </div>
+          <button class="btn btn-primary" onclick="show('family-dashboard')">Vào Trạm quản lý gia đình</button>
+        </div>
+      </div>
+
+      <!-- FAMILY DASHBOARD -->
+      <div class="screen" id="family-dashboard" data-flow="Người thân · Trạm quản lý gia đình">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <div style="display:flex;gap:14px;margin-bottom:14px;">
+            <div style="text-align:center;">
+              <div class="avatar lg blink-red" id="avatarFather" style="background:var(--blue);cursor:pointer;" onclick="switchProfile('Bố')">B<span class="dot-online"></span></div>
+              <div class="fine">Bố</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="avatar lg" style="background:var(--orange);cursor:pointer;" onclick="switchProfile('Mẹ')">M<span class="dot-online"></span></div>
+              <div class="fine">Mẹ</div>
+            </div>
+          </div>
+
+          <div class="card" id="statusCardFamily" style="text-align:center;">
+            <div style="font-family:'Baloo 2';font-size:17px;font-weight:700;" id="profileName">Đang xem: Bố</div>
+            <span class="status-pill status-warn" id="statusPillFamily">⚠ Cần chú ý — chưa uống thuốc 08:00</span>
+          </div>
+
+          <div class="shortcut-row" style="margin-bottom:14px;">
+            <div class="shortcut" style="background:var(--green-pale);color:var(--green-dark);" onclick="show('family-videocall')"><span class="emo">📹</span>Gọi Video</div>
+            <div class="shortcut" style="background:var(--orange-pale);color:#a1571b;" onclick="show('family-add-medication')"><span class="emo">💊</span>Thêm thuốc</div>
+            <div class="shortcut" style="background:var(--blue-pale);color:#1f4c73;" onclick="show('family-message')"><span class="emo">💬</span>Nhắn tin</div>
+          </div>
+
+          <h3 style="font-size:14px;margin:4px 0 8px;">Nhật ký dòng thời gian</h3>
+          <div class="card" style="padding:6px 14px;">
+            <div class="timeline-item"><div class="tl-dot warn"></div><div><div class="tl-time">08:02</div><div class="tl-text">Chưa xác nhận uống thuốc huyết áp</div></div></div>
+            <div class="timeline-item"><div class="tl-dot ok"></div><div><div class="tl-time">07:15</div><div class="tl-text">Nhịp tim 72 bpm — bình thường</div></div></div>
+            <div class="timeline-item"><div class="tl-dot ok"></div><div><div class="tl-time">06:40</div><div class="tl-text">Mở khóa màn hình, bắt đầu ngày mới</div></div></div>
+          </div>
+
+          <button class="btn btn-outline" onclick="show('family-add-wearable')">➕ Thêm thiết bị đeo</button>
+          <div class="link-small" onclick="triggerCrossAlert()">▶ Mô phỏng: phát hiện bất thường ở hồ sơ khác</div>
+        </div>
+      </div>
+
+      <div class="screen" id="family-videocall" data-flow="Người thân · Gọi video">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="background:#12201a;color:#fff;margin:-16px -18px -24px;height:calc(100% + 40px);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div class="avatar lg" style="background:var(--blue);margin-bottom:14px;">B</div>
+          <div style="font-family:'Baloo 2';font-size:18px;">Đang gọi Bố…</div>
+          <button class="btn btn-danger" style="width:60%;margin-top:30px;" onclick="show('family-dashboard')">Kết thúc</button>
+        </div>
+      </div>
+
+      <div class="screen" id="family-add-medication" data-flow="Người thân · Thêm thuốc mới">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('family-dashboard')">← Quay lại</span>
+          <h2 class="scr-title">Thêm thuốc mới cho Bố</h2>
+          <div class="card"><p class="fine">Tên thuốc</p><div style="font-weight:700;">Amlodipine 5mg</div></div>
+          <div class="card"><p class="fine">Giờ uống</p><div style="font-weight:700;">08:00 · 20:00</div></div>
+          <button class="btn btn-primary" onclick="showToast('Đã thêm lịch thuốc cho Bố');show('family-dashboard')">Lưu lịch thuốc</button>
+        </div>
+      </div>
+
+      <div class="screen" id="family-message" data-flow="Người thân · Nhắn tin">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('family-dashboard')">← Quay lại</span>
+          <h2 class="scr-title">Nhắn tin cho Bố</h2>
+          <div class="card">Bố ơi, chiều nay con qua thăm nhé!</div>
+          <button class="btn btn-primary" onclick="showToast('Đã gửi tin nhắn');show('family-dashboard')">Gửi</button>
+        </div>
+      </div>
+
+      <!-- SOS receive -->
+      <div class="screen" id="family-sos-alert" data-flow="Người thân · Nhận SOS khẩn cấp">
+        <div class="statusbar" style="color:#fff;"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="background:linear-gradient(180deg,#c73b3b,#8f2828);color:#fff;margin:-16px -18px -24px;height:calc(100% + 40px);display:flex;flex-direction:column;">
+          <div style="text-align:center;margin-top:10px;">
+            <div style="font-size:44px;">🚨</div>
+            <h2 style="font-family:'Baloo 2';font-size:22px;margin:8px 0 2px;">BỐ ĐANG GẶP NGUY HIỂM</h2>
+            <p style="font-size:12.5px;opacity:.85;">SOS được kích hoạt lúc 14:05 · Vị trí đã được ghi nhận</p>
+          </div>
+          <div style="flex:1;margin:14px 0;border-radius:16px;background:repeating-linear-gradient(0deg,#a94a4a 0 1px,transparent 1px 24px), repeating-linear-gradient(90deg,#a94a4a 0 1px,transparent 1px 24px), #b23e3e; position:relative;">
+            <div style="position:absolute;top:45%;left:50%;font-size:26px;transform:translate(-50%,-50%);">📍</div>
+          </div>
+          <button class="btn" style="background:#fff;color:var(--red);" onclick="show('family-sos-videocall')">TIẾP NHẬN HỖ TRỢ</button>
+        </div>
+      </div>
+
+      <div class="screen" id="family-sos-videocall" data-flow="Người thân · Video call khẩn cấp">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="background:#12201a;color:#fff;margin:-16px -18px -24px;height:calc(100% + 40px);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div class="avatar lg" style="background:var(--red);margin-bottom:14px;">B</div>
+          <div style="font-family:'Baloo 2';font-size:18px;">Video call khẩn cấp với Bố</div>
+          <button class="btn btn-outline" style="width:70%;margin-top:26px;" onclick="show('family-sos-taken')">Xem như “người con khác”</button>
+          <button class="btn btn-danger" style="width:70%;" onclick="show('family-dashboard')">Kết thúc</button>
+        </div>
+      </div>
+
+      <div class="screen" id="family-sos-taken" data-flow="Người thân · Người khác đã tiếp nhận">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;">
+          <div style="font-size:40px;">✅</div>
+          <h2 class="scr-title">Đã có người tiếp nhận</h2>
+          <p class="scr-sub">Anh Cả đã tiếp nhận hỗ trợ Bố lúc 14:05.</p>
+          <button class="btn btn-primary" onclick="show('family-dashboard')">Về Trạm quản lý</button>
+        </div>
+      </div>
+
+      <div class="screen" id="family-add-wearable" data-flow="Người thân · Thêm thiết bị đeo">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('family-dashboard')">← Quay lại</span>
+          <h2 class="scr-title">Thêm thiết bị đeo</h2>
+          <p class="scr-sub">Bật Bluetooth để dò tìm vòng tay thông minh.</p>
+          <div class="card role-card" onclick="show('family-wearable-assign')">
+            <div class="ic" style="background:var(--blue-pale);">⌚</div>
+            <div><h3>Mi Band 8</h3><p>Đã tìm thấy · sẵn sàng ghép nối</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen" id="family-wearable-assign" data-flow="Người thân · Gán chức năng vòng tay">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <h2 class="scr-title">Gán chức năng</h2>
+          <p class="scr-sub">Thiết lập lệnh khẩn cấp cho vòng tay của Bố.</p>
+          <div class="card"><b>Bấm giữ 3 giây → Gửi tín hiệu SOS</b></div>
+          <button class="btn btn-primary" onclick="showToast('Đã ghép nối vòng tay thành công');show('family-dashboard')">Hoàn tất</button>
+        </div>
+      </div>
+
+      <!-- ============ BRANCH B: ELDER KIOSK ============ -->
+      <div class="screen" id="elder-enter-code" data-flow="Bố mẹ · Nhập mã kết nối">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="text-align:center;padding-top:30px;">
+          <span class="back-inline" onclick="show('role-select')">← Đổi vai trò</span>
+          <h2 class="scr-title">Nhập mã kết nối</h2>
+          <p class="scr-sub">Người thân hoặc tình nguyện viên nhập mã 6 số từ máy của con.</p>
+          <div class="card" style="font-family:'Baloo 2';font-size:30px;font-weight:800;letter-spacing:6px;color:var(--green-dark);">482 913</div>
+          <button class="btn btn-primary" onclick="show('elder-home')">Kết nối &amp; Bắt đầu</button>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-home" data-flow="Bố mẹ · Trang chủ (Kiosk)">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <button class="big-btn sos" onclick="startSOSCountdown()"><span class="emo">🆘</span>SOS</button>
+          <button class="big-btn call" onclick="startVoice('elder-call-select')"><span class="emo">📞</span>GỌI CON</button>
+          <div class="shortcut-row">
+            <div class="shortcut med" onclick="show('elder-medication-schedule')"><span class="emo">💊</span>Lịch thuốc</div>
+            <div class="shortcut health" onclick="show('elder-health')"><span class="emo">🩺</span>Sức khỏe</div>
+          </div>
+          <div class="voice-bar" onclick="startVoice('elder-call-select')"><span class="mic">🎙️</span>“An Tâm ơi, gọi con tôi”</div>
+          <div class="link-small" onclick="show('elder-incoming-call')">▶ Mô phỏng: có cuộc gọi đến</div>
+          <div class="link-small" onclick="ringMedication()">▶ Mô phỏng: đến giờ uống thuốc</div>
+        </div>
+        <div class="voice-overlay" id="voiceOverlay"><div class="pulse">🎙️</div><div style="font-family:'Baloo 2';font-size:18px;">Đang nghe…</div><div style="font-size:13.5px;opacity:.8;margin-top:6px;">“An Tâm ơi, gọi con tôi”</div></div>
+        <div class="med-popup" id="medPopup">
+          <div class="med-sheet">
+            <div class="emo">💊</div>
+            <h2>Bố ơi uống thuốc nhé</h2>
+            <p>Đã đến giờ uống Amlodipine 5mg · 08:00</p>
+            <button class="btn btn-primary" onclick="confirmMedication()">XÁC NHẬN ĐÃ UỐNG</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-sos-countdown" data-flow="Bố mẹ · Đếm ngược SOS">
+        <div class="content">
+          <div style="font-family:'Baloo 2';font-size:20px;">Đang gửi tín hiệu SOS trong</div>
+          <div class="count-num" id="sosCountNum">3</div>
+          <button class="btn" style="background:#fff;color:var(--red);width:70%;" onclick="cancelSOS()">HỦY</button>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-sos-broadcasting" data-flow="Bố mẹ · Đang phát tín hiệu SOS">
+        <div class="content">
+          <div class="broadcast-dot">📡</div>
+          <div style="font-family:'Baloo 2';font-size:19px;">Đang gửi cảnh báo và vị trí</div>
+          <div style="font-size:13px;opacity:.85;margin-top:6px;">đến tất cả người thân của bạn</div>
+          <div class="link-small" style="color:#fff;margin-top:26px;" onclick="show('family-sos-alert')">▶ Xem gia đình nhận cảnh báo</div>
+          <button class="btn btn-outline" style="width:70%;margin-top:16px;" onclick="show('elder-home')">Về Trang chủ</button>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-call-select" data-flow="Bố mẹ · Chọn người gọi">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('elder-home')">← Quay lại</span>
+          <h2 class="scr-title">Gọi ai đây?</h2>
+          <div class="card role-card" onclick="show('elder-videocall')">
+            <div class="avatar" style="background:var(--blue);">Ú<span class="dot-online"></span></div>
+            <div><h3>Út — đang online</h3></div>
+          </div>
+          <div class="card role-card" onclick="show('elder-videocall')">
+            <div class="avatar" style="background:var(--orange);">C</div>
+            <div><h3>Cả</h3></div>
+          </div>
+          <div class="card role-card" onclick="show('elder-videocall')">
+            <div class="avatar" style="background:var(--green);">H</div>
+            <div><h3>Hai</h3></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen" id="elder-videocall" data-flow="Bố mẹ · Cuộc gọi video">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content" style="background:#12201a;color:#fff;margin:-16px -18px -24px;height:calc(100% + 40px);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <div class="avatar lg" style="background:var(--blue);margin-bottom:14px;">Ú</div>
+          <div style="font-family:'Baloo 2';font-size:19px;">Đang gọi cho Út…</div>
+          <button class="btn btn-danger" style="width:60%;margin-top:30px;" onclick="show('elder-home')">Kết thúc</button>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-incoming-call" data-flow="Bố mẹ · Cuộc gọi đến">
+        <div class="content" style="align-items:center;justify-content:center;">
+          <div class="avatar lg" style="background:var(--blue);margin-bottom:14px;">Ú</div>
+          <div style="font-family:'Baloo 2';font-size:20px;margin-bottom:40px;">Út đang gọi…</div>
+          <div class="call-2btn">
+            <button class="call-round decline" onclick="show('elder-home')">✕</button>
+            <button class="call-round accept" onclick="show('elder-videocall')">✓</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-medication-schedule" data-flow="Bố mẹ · Lịch thuốc">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('elder-home')">← Quay lại</span>
+          <h2 class="scr-title">Lịch thuốc hôm nay</h2>
+          <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+            <div><b>Amlodipine 5mg</b><div class="fine">08:00 sáng</div></div>
+            <span class="status-pill status-warn">Chưa uống</span>
+          </div>
+          <div class="card" style="display:flex;justify-content:space-between;align-items:center;opacity:.55;">
+            <div><b>Vitamin D</b><div class="fine">07:00 sáng</div></div>
+            <span class="status-pill status-safe">Đã uống</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen kiosk" id="elder-health" data-flow="Bố mẹ · Sức khỏe">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('elder-home')">← Quay lại</span>
+          <h2 class="scr-title">Chỉ số sức khỏe</h2>
+          <div class="card"><b>Nhịp tim</b><div style="font-size:24px;font-weight:800;color:var(--blue);">72 bpm</div><div class="fine">Bình thường</div></div>
+          <div class="card"><b>Bước chân hôm nay</b><div style="font-size:24px;font-weight:800;color:var(--green);">1,840</div></div>
+        </div>
+      </div>
+
+      <!-- ============ BRANCH C: VOLUNTEER ============ -->
+      <div class="screen" id="volunteer-feed" data-flow="Tình nguyện viên · Bảng tin nhiệm vụ">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('role-more')">← Đổi vai trò</span>
+          <h2 class="scr-title">Nhiệm vụ gần bạn</h2>
+          <div class="card">
+            <b>Cần cài đặt ứng dụng</b>
+            <p class="fine" style="margin:4px 0 10px;">Bác Năm, 68 tuổi · cách 800m</p>
+            <button class="btn btn-primary" onclick="show('volunteer-task-accepted')" style="margin:0;">NHẬN HỖ TRỢ</button>
+          </div>
+          <div class="card"><b>Mua thuốc giúp</b><p class="fine" style="margin:4px 0 0;">Cô Ba, 74 tuổi · cách 1.2km</p></div>
+          <div class="card"><b>Trò chuyện cùng cụ</b><p class="fine" style="margin:4px 0 0;">Ông Tư, 80 tuổi · cách 2km</p></div>
+          <div class="link-small" onclick="show('volunteer-radar')">▶ Xem Radar SOS</div>
+        </div>
+      </div>
+
+      <div class="screen" id="volunteer-task-accepted" data-flow="Tình nguyện viên · Đã nhận nhiệm vụ">
+        <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;">
+          <div style="font-size:40px;">✅</div>
+          <h2 class="scr-title">Đã nhận hỗ trợ</h2>
+          <p class="scr-sub">Bác Năm đã được báo tin bạn sẽ đến giúp.</p>
+          <button class="btn btn-primary" onclick="show('volunteer-feed')">Về bảng tin</button>
+        </div>
+      </div>
+
+      <div class="screen" id="volunteer-radar" data-flow="Tình nguyện viên · Radar SOS">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('volunteer-feed')">← Quay lại</span>
+          <h2 class="scr-title">Radar ứng cứu</h2>
+          <p class="scr-sub">Tín hiệu khẩn cấp từ người già neo đơn xuất hiện tại đây.</p>
+          <div class="radar-map">
+            <div class="radar-ring"></div>
+            <div class="radar-signal"></div>
+          </div>
+          <button class="btn btn-danger" onclick="show('volunteer-confirm-rescue')">XÁC NHẬN ỨNG CỨU</button>
+        </div>
+      </div>
+
+      <div class="screen" id="volunteer-confirm-rescue" data-flow="Tình nguyện viên · Xác nhận ứng cứu">
+        <div class="statusbar"><span>9:41</span><span>●●● 5G 🔋</span></div>
+        <div class="content">
+          <h2 class="scr-title">Đang dẫn đường đến hiện trường</h2>
+          <div class="card">📍 123 Đường Nguyễn Trãi, cách 350m</div>
+          <div class="card">☎️ Đã kết nối với Trạm y tế phường</div>
+          <button class="btn btn-primary" onclick="show('volunteer-feed')">Hoàn tất</button>
+        </div>
+      </div>
+
+      <!-- ============ BRANCH D: NURSING HOME (B2B) ============ -->
+      <div class="screen" id="nursing-master-dashboard" data-flow="Viện dưỡng lão · Giám sát tổng thể" data-tablet="1">
+        <div class="statusbar"><span>9:41</span><span>Web Dashboard · Viện dưỡng lão An Vui</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('role-more')">← Đổi vai trò</span>
+          <h2 class="scr-title">Giám sát tổng thể</h2>
+          <div class="patient-grid" id="patientGrid"></div>
+          <button class="btn btn-outline" style="margin-top:14px;" onclick="show('nursing-bulk-schedule-select-group')">Tạo lịch thuốc hàng loạt</button>
+        </div>
+      </div>
+
+      <div class="screen" id="nursing-patient-alert" data-flow="Viện dưỡng lão · Cảnh báo bệnh nhân" data-tablet="1">
+        <div class="statusbar" style="color:#fff;"><span>9:41</span><span>Web Dashboard</span></div>
+        <div class="content" style="background:linear-gradient(180deg,#c73b3b,#8f2828);color:#fff;margin:-16px -18px -24px;height:calc(100% + 40px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+          <div style="font-size:44px;">🚨</div>
+          <h2 style="font-family:'Baloo 2';font-size:20px;">Bệnh nhân phòng 204 bấm SOS</h2>
+          <p style="font-size:13px;opacity:.85;">Nghi ngã · còi báo động đang kêu</p>
+          <button class="btn" style="background:#fff;color:var(--red);width:60%;margin-top:20px;" onclick="show('nursing-master-dashboard')">TIẾP NHẬN</button>
+        </div>
+      </div>
+
+      <div class="screen" id="nursing-bulk-schedule-select-group" data-flow="Viện dưỡng lão · Chọn nhóm bệnh nhân" data-tablet="1">
+        <div class="statusbar"><span>9:41</span><span>Web Dashboard</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('nursing-master-dashboard')">← Quay lại</span>
+          <h2 class="scr-title">Chọn nhóm bệnh nhân</h2>
+          <p class="scr-sub">Nhóm: 10 cụ mắc tiểu đường</p>
+          <div class="card" style="max-height:150px;overflow-y:auto;">
+            <div class="check-row"><input type="checkbox" checked>Cụ Năm — P.101</div>
+            <div class="check-row"><input type="checkbox" checked>Cụ Ba — P.102</div>
+            <div class="check-row"><input type="checkbox" checked>Cụ Tư — P.103</div>
+            <div class="check-row"><input type="checkbox" checked>… và 7 người khác</div>
+          </div>
+          <button class="btn btn-primary" onclick="show('nursing-bulk-schedule-time')">Tiếp tục</button>
+        </div>
+      </div>
+
+      <div class="screen" id="nursing-bulk-schedule-time" data-flow="Viện dưỡng lão · Nhập giờ uống thuốc" data-tablet="1">
+        <div class="statusbar"><span>9:41</span><span>Web Dashboard</span></div>
+        <div class="content">
+          <span class="back-inline" onclick="show('nursing-bulk-schedule-select-group')">← Quay lại</span>
+          <h2 class="scr-title">Giờ uống thuốc chung</h2>
+          <div class="card" style="text-align:center;font-family:'Baloo 2';font-size:30px;font-weight:800;color:var(--green-dark);">08:00 sáng</div>
+          <button class="btn btn-primary" onclick="show('nursing-bulk-schedule-confirm')">Xác nhận &amp; Gửi</button>
+        </div>
+      </div>
+
+      <div class="screen" id="nursing-bulk-schedule-confirm" data-flow="Viện dưỡng lão · Đã gửi lịch hàng loạt" data-tablet="1">
+        <div class="content" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;">
+          <div style="font-size:40px;">✅</div>
+          <h2 class="scr-title">Đã gửi thông báo</h2>
+          <p class="scr-sub">Nhắc nhở uống thuốc 08:00 đã được đẩy đến 10 thiết bị bệnh nhân.</p>
+          <button class="btn btn-primary" onclick="show('nursing-master-dashboard')">Về Giám sát tổng thể</button>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const stack = [];
+  const phone = document.getElementById('phone');
+  const crumb = document.getElementById('breadcrumb');
+
+  function show(id, opts={}){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    const el = document.getElementById(id);
+    el.classList.add('active');
+    crumb.textContent = el.dataset.flow || id;
+    phone.classList.toggle('tablet', el.dataset.tablet === '1');
+    if(opts.push !== false) stack.push(id);
+  }
+  function goBack(){
+    if(stack.length > 1){ stack.pop(); show(stack[stack.length-1], {push:false}); }
+  }
+  function restart(){
+    stack.length = 0;
+    show('splash');
+    setTimeout(()=>{ show('role-select'); }, 2200);
+  }
+
+  function startVoice(target){
+    const ov = document.getElementById('voiceOverlay');
+    ov.classList.add('show');
+    setTimeout(()=>{ ov.classList.remove('show'); show(target); }, 1500);
+  }
+
+  let sosTimer;
+  function startSOSCountdown(){
+    show('elder-sos-countdown');
+    let n = 3;
+    document.getElementById('sosCountNum').textContent = n;
+    sosTimer = setInterval(()=>{
+      n--;
+      if(n <= 0){ clearInterval(sosTimer); show('elder-sos-broadcasting'); }
+      else document.getElementById('sosCountNum').textContent = n;
+    }, 1000);
+  }
+  function cancelSOS(){ clearInterval(sosTimer); show('elder-home'); }
+
+  function ringMedication(){
+    document.getElementById('medPopup').classList.add('show');
+  }
+  function confirmMedication(){
+    document.getElementById('medPopup').classList.remove('show');
+    showToast('Đã xác nhận uống thuốc — đồng bộ tới máy con cái');
+  }
+
+  function switchProfile(name){
+    document.getElementById('profileName').textContent = 'Đang xem: ' + name;
+    const pill = document.getElementById('statusPillFamily');
+    if(name === 'Bố'){
+      pill.className = 'status-pill status-warn';
+      pill.textContent = '⚠ Cần chú ý — chưa uống thuốc 08:00';
+    } else {
+      pill.className = 'status-pill status-safe';
+      pill.textContent = '● An toàn — mọi chỉ số bình thường';
+    }
+  }
+  function triggerCrossAlert(){
+    document.getElementById('avatarFather').classList.add('blink-red');
+    showToast('Phát hiện: Bố chưa uống thuốc — chạm vào ảnh đại diện Bố để xử lý');
+  }
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(()=> t.classList.remove('show'), 2600);
+  }
+
+  // build nursing patient grid
+  const patients = [
+    {ok:1},{ok:1},{ok:1},{ok:1},{ok:1},{ok:1},{ok:1},
+    {warn:1},{warn:1},
+    {danger:1}
+  ];
+  const grid = document.getElementById('patientGrid');
+  patients.forEach((p, i)=>{
+    const cell = document.createElement('div');
+    let cls = 'ok', label = 'P.'+(101+i), icon='';
+    if(p.warn){ cls='warn'; icon='⚠️'; }
+    if(p.danger){ cls='danger'; icon='🚨'; label='P.204'; }
+    cell.className = 'patient-cell ' + cls + (p.danger ? ' blink-red' : '');
+    cell.innerHTML = icon + '<br>' + label;
+    if(p.danger) cell.onclick = () => show('nursing-patient-alert');
+    grid.appendChild(cell);
+  });
+
+  restart();
+</script>
+</body>
+</html>
